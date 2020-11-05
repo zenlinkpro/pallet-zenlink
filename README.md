@@ -4,8 +4,8 @@
 pallet-zenlink is a set of the pallets that implement 
 the [Zenlink Protocol](https://zenlink.pro/) which is `A cross-chain DEX network based on Polkadot`
 
-- `zenlink-assets`: the implement of the ERC20 assets.
-- `zenlink-dex`: the implement of the Uniswap v1 functionality. it is closely coupled to the `zenlink-assets`
+- [zenlink-assets](./assets/README.md): the implement of the ERC20 assets.
+- [zenlink-dex](./dex/README.md): the implement of the Uniswap v1 functionality. it is closely coupled to the `zenlink-assets`
 
 ## work flow
 - issue some tokens which are ERC20 assets by `zenlink-assets` module.

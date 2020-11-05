@@ -522,7 +522,7 @@ decl_module! {
         /// User specifies the exact amount of token to sold and the amount not less the minimum
         /// other token to be returned.
         /// - `swap_handler`: The wrapper of exchangeId and assetId to access.
-        /// - `other_exchange_id`: ID of other exchange to access.
+        /// - `other_swap_handle`: The wrapper of exchangeId and assetId to access.
         /// - `token_sold`: The token balance amount to be sold.
         /// - `min_other_token`: The minimum other token expected to buy.
         /// - `deadline`: When to invalidate the transaction.
@@ -580,7 +580,7 @@ decl_module! {
         /// User specifies the maximum token to be sold and the exact
         /// other token to be returned.
         /// - `swap_handler`: The wrapper of exchangeId and assetId to access.
-        /// - `other_exchange_id`: ID of other exchange to access.
+        /// - `other_swap_handle`: The wrapper of exchangeId and assetId to access..
         /// - `other_token_bought`: The amount of the other token to buy.
         /// - `max_token`: The maximum token expected to be sold.
         /// - `deadline`: When to invalidate the transaction.
