@@ -18,3 +18,6 @@ the [Zenlink Protocol](https://zenlink.pro/) which is `A cross-chain DEX network
 ```bash
 cargo test
 ```
+
+## license
+under Apache License v2
