@@ -104,7 +104,7 @@ decl_module! {
             target: <T::Lookup as StaticLookup>::Source,
             #[compact] amount: T::TokenBalance
         ){
-            let spender = ensure_signed(origin.clone())?;
+            let spender = ensure_signed(origin)?;
             let owner = T::Lookup::lookup(from)?;
             let target = T::Lookup::lookup(target)?;
 
@@ -210,7 +210,7 @@ impl<T: Trait> Module<T> {
         });
 
         Self::deposit_event(RawEvent::Transferred(
-            id.clone(),
+            *id,
             owner.clone(),
             target.clone(),
             amount,
@@ -229,7 +229,7 @@ impl<T: Trait> Module<T> {
         <Allowances<T>>::mutate((id, owner, spender), |balance| *balance = amount);
 
         Self::deposit_event(RawEvent::Approval(
-            id.clone(),
+            *id,
             owner.clone(),
             spender.clone(),
             amount,
@@ -269,7 +269,7 @@ impl<T: Trait> Module<T> {
             *supply = supply.saturating_add(amount);
         });
 
-        Self::deposit_event(RawEvent::Minted(id.clone(), owner.clone(), amount));
+        Self::deposit_event(RawEvent::Minted(*id, owner.clone(), amount));
 
         Ok(())
     }
@@ -287,7 +287,7 @@ impl<T: Trait> Module<T> {
             *supply = supply.saturating_sub(amount);
         });
 
-        Self::deposit_event(RawEvent::Burned(id.clone(), owner.clone(), amount));
+        Self::deposit_event(RawEvent::Burned(*id, owner.clone(), amount));
 
         Ok(())
     }
