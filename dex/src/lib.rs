@@ -9,18 +9,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Decode, Encode};
+use frame_support::{
+    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure,
+    Parameter,
+    traits::{Currency, ExistenceRequirement, Get},
+};
+use frame_system::ensure_signed;
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
+use sp_runtime::{ModuleId, RuntimeDebug};
 use sp_runtime::traits::{
     AccountIdConversion, AtLeast32Bit, CheckedAdd, MaybeSerializeDeserialize, Member, One,
     SaturatedConversion, Zero,
 };
-use sp_runtime::{ModuleId, RuntimeDebug};
-
-use frame_support::{
-    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure,
-    traits::{Currency, ExistenceRequirement, Get},
-    Parameter,
-};
-use frame_system::ensure_signed;
 
 use zenlink_assets::AssetInfo;
 
@@ -28,6 +29,7 @@ use zenlink_assets::AssetInfo;
 mod mock;
 #[cfg(test)]
 mod tests;
+mod rpc;
 
 /// ZLK liquidity token info
 const ZLK: &AssetInfo = &AssetInfo {
@@ -39,13 +41,15 @@ const ZLK: &AssetInfo = &AssetInfo {
 
 /// The Dex main structure
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct Exchange<AccountId, AssetId> {
     // The token being swapped.
-    token_id: AssetId,
+    pub token_id: AssetId,
     // The exchange liquidity asset.
-    liquidity_id: AssetId,
+    pub liquidity_id: AssetId,
     // This exchange account.
-    account: AccountId,
+    pub account: AccountId,
 }
 
 /// The wrapper of exchangeId and assetId to access
