@@ -4,10 +4,11 @@
 use codec::{Decode, Encode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, ensure, Parameter};
 use frame_system::ensure_signed;
-use sp_runtime::traits::{
-    AtLeast32Bit, AtLeast32BitUnsigned, CheckedSub, Member, One, Saturating, StaticLookup, Zero,
-};
 use sp_runtime::{DispatchResult, RuntimeDebug};
+use sp_runtime::traits::{
+    AtLeast32Bit, AtLeast32BitUnsigned, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, StaticLookup,
+    Zero,
+};
 
 #[cfg(test)]
 mod mock;
@@ -32,10 +33,10 @@ pub trait Trait: frame_system::Trait {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 
     /// The units in which we record balances.
-    type TokenBalance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
+    type TokenBalance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize;
 
     /// The arithmetic type of asset identifier.
-    type AssetId: Parameter + AtLeast32Bit + Default + Copy;
+    type AssetId: Parameter + AtLeast32Bit + Default + Copy + MaybeSerializeDeserialize;
 }
 
 // TODO: weight
@@ -104,7 +105,7 @@ decl_module! {
             target: <T::Lookup as StaticLookup>::Source,
             #[compact] amount: T::TokenBalance
         ){
-            let spender = ensure_signed(origin.clone())?;
+            let spender = ensure_signed(origin)?;
             let owner = T::Lookup::lookup(from)?;
             let target = T::Lookup::lookup(target)?;
 
@@ -210,7 +211,7 @@ impl<T: Trait> Module<T> {
         });
 
         Self::deposit_event(RawEvent::Transferred(
-            id.clone(),
+            *id,
             owner.clone(),
             target.clone(),
             amount,
@@ -229,7 +230,7 @@ impl<T: Trait> Module<T> {
         <Allowances<T>>::mutate((id, owner, spender), |balance| *balance = amount);
 
         Self::deposit_event(RawEvent::Approval(
-            id.clone(),
+            *id,
             owner.clone(),
             spender.clone(),
             amount,
@@ -269,7 +270,7 @@ impl<T: Trait> Module<T> {
             *supply = supply.saturating_add(amount);
         });
 
-        Self::deposit_event(RawEvent::Minted(id.clone(), owner.clone(), amount));
+        Self::deposit_event(RawEvent::Minted(*id, owner.clone(), amount));
 
         Ok(())
     }
@@ -287,7 +288,7 @@ impl<T: Trait> Module<T> {
             *supply = supply.saturating_sub(amount);
         });
 
-        Self::deposit_event(RawEvent::Burned(id.clone(), owner.clone(), amount));
+        Self::deposit_event(RawEvent::Burned(*id, owner.clone(), amount));
 
         Ok(())
     }

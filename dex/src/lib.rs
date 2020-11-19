@@ -9,25 +9,28 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Decode, Encode};
+use frame_support::{
+    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure,
+    Parameter,
+    traits::{Currency, ExistenceRequirement, Get},
+};
+use frame_system::ensure_signed;
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
+use sp_runtime::{ModuleId, RuntimeDebug};
 use sp_runtime::traits::{
     AccountIdConversion, AtLeast32Bit, CheckedAdd, MaybeSerializeDeserialize, Member, One,
     SaturatedConversion, Zero,
 };
-use sp_runtime::{ModuleId, RuntimeDebug};
 
-use frame_support::{
-    decl_error, decl_event, decl_module, decl_storage, dispatch, ensure,
-    traits::{Currency, ExistenceRequirement, Get},
-    Parameter,
-};
-use frame_system::ensure_signed;
-
+pub use rpc::{ExchangeInfo, TokenInfo};
 use zenlink_assets::AssetInfo;
 
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
+mod rpc;
 
 /// ZLK liquidity token info
 const ZLK: &AssetInfo = &AssetInfo {
@@ -39,13 +42,15 @@ const ZLK: &AssetInfo = &AssetInfo {
 
 /// The Dex main structure
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct Exchange<AccountId, AssetId> {
     // The token being swapped.
-    token_id: AssetId,
+    pub token_id: AssetId,
     // The exchange liquidity asset.
-    liquidity_id: AssetId,
+    pub liquidity_id: AssetId,
     // This exchange account.
-    account: AccountId,
+    pub account: AccountId,
 }
 
 /// The wrapper of exchangeId and assetId to access
@@ -193,8 +198,8 @@ decl_module! {
             // create a new lp token for exchange
             let liquidity_id = <zenlink_assets::Module<T>>::inner_issue(&account, Zero::zero(), ZLK);
             let new_exchange = Exchange {
-                token_id: token_id,
-                liquidity_id: liquidity_id,
+                token_id,
+                liquidity_id,
                 account: account.clone(),
             };
 
@@ -232,7 +237,7 @@ decl_module! {
             let now = frame_system::Module::<T>::block_number();
             ensure!(deadline > now, Error::<T>::Deadline);
 
-            let who = ensure_signed(origin.clone())?;
+            let who = ensure_signed(origin)?;
 
             ensure!(max_token > Zero::zero(), Error::<T>::ZeroToken);
             ensure!(currency_amount > Zero::zero(), Error::<T>::ZeroCurrency);
@@ -275,7 +280,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -300,7 +305,7 @@ decl_module! {
             let now = frame_system::Module::<T>::block_number();
             ensure!(deadline > now, Error::<T>::Deadline);
 
-            let who = ensure_signed(origin.clone())?;
+            let who = ensure_signed(origin)?;
 
             ensure!(zlk_to_burn > Zero::zero(), Error::<T>::BurnZeroZLKShares);
 
@@ -313,8 +318,8 @@ decl_module! {
 
                 let token_reserve = Self::get_token_reserve(&exchange);
                 let currency_reserve = Self::get_currency_reserve(&exchange);
-                let currency_amount = zlk_to_burn.clone() * Self::convert(currency_reserve) / total_liquidity.clone();
-                let token_amount = zlk_to_burn.clone() * token_reserve / total_liquidity.clone();
+                let currency_amount = zlk_to_burn * Self::convert(currency_reserve) / total_liquidity;
+                let token_amount = zlk_to_burn * token_reserve / total_liquidity;
 
                 ensure!(Self::unconvert(currency_amount) >= min_currency, Error::<T>::NotEnoughCurrency);
                 ensure!(token_amount >= min_token, Error::<T>::NotEnoughToken);
@@ -327,7 +332,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -373,7 +378,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -419,7 +424,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -466,7 +471,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -513,7 +518,7 @@ decl_module! {
 
                 Ok(())
             } else {
-                Err(Error::<T>::ExchangeNotExists)?
+                Err(Error::<T>::ExchangeNotExists.into())
             }
         }
 
@@ -550,7 +555,7 @@ decl_module! {
             let get_exchange = Self::get_exchange(exchange_id);
             let get_othere_exchange = Self::get_exchange(other_exchange_id);
             if get_exchange.is_none() || get_othere_exchange.is_none() {
-                return Err(Error::<T>::ExchangeNotExists)?
+                return Err(Error::<T>::ExchangeNotExists.into())
             }
             let exchange = get_exchange.unwrap();
             let other_exchange = get_othere_exchange.unwrap();
@@ -607,7 +612,7 @@ decl_module! {
             let get_exchange = Self::get_exchange(exchange_id);
             let get_othere_exchange = Self::get_exchange(other_exchange_id);
             if get_exchange.is_none() || get_othere_exchange.is_none() {
-                return Err(Error::<T>::ExchangeNotExists)?
+                return Err(Error::<T>::ExchangeNotExists.into())
             }
             let exchange = get_exchange.unwrap();
             let other_exchange = get_othere_exchange.unwrap();

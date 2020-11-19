@@ -1,5 +1,7 @@
 [workspace]
 members = [
     "assets",
-    "dex"
+    "dex",
+    "dex/rpc",
+    "dex/rpc/runtime-api"
 ]

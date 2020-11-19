@@ -4,6 +4,9 @@
  Built-in decentralized exchange modules in Substrate 2.0 network, 
  the swap mechanism refers to the design of Uniswap V1.
  
+## [zenlink-dex-rpc](./RPC.md)
+zenlink-dex custom rpc calls
+
 ## variants
 
 ##### 1. create_exchange`(AssetId)`
