@@ -2,5 +2,6 @@
 members = [
     "assets",
     "dex",
-    "dex/rpc"
+    "dex/rpc",
+    "dex/rpc/runtime-api"
 ]

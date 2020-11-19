@@ -23,6 +23,7 @@ use sp_runtime::traits::{
     SaturatedConversion, Zero,
 };
 
+pub use rpc::{ExchangeInfo, TokenInfo};
 use zenlink_assets::AssetInfo;
 
 #[cfg(test)]

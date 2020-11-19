@@ -3709,11 +3709,12 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "zenlink-assets"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -3737,7 +3738,7 @@ dependencies = [
 
 [[package]]
 name = "zenlink-dex-rpc"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
@@ -3754,7 +3755,7 @@ dependencies = [
 
 [[package]]
 name = "zenlink-dex-runtime-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "parity-scale-codec",
  "serde_json",

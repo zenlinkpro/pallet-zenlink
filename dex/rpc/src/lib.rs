@@ -1,21 +1,137 @@
-//! RPC interface for the transaction payment module.
+//! RPC interface for the zenlink dex module.
+#![allow(clippy::type_complexity)]
 
+#[cfg(feature = "std")]
+use std::{
+    fmt::{Debug, Display},
+    result::Result as StdResult,
+    str::FromStr,
+};
 use std::sync::Arc;
 
 use codec::Codec;
 use jsonrpc_core::{Error as RpcError, ErrorCode, Result};
 use jsonrpc_derive::rpc;
+#[cfg(feature = "std")]
+use serde::{de, Deserialize, ser, Serialize};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
 
-use zenlink_dex::Exchange;
+use zenlink_dex::{Exchange, ExchangeInfo, TokenInfo};
 use zenlink_dex_runtime_api::ZenlinkDexApi as ZenlinkDexRuntimeApi;
 
+/// A helper struct for handling u128 serialization/deserialization of RPC.
+/// See https://github.com/polkadot-js/api/issues/2464 for details (shit!).
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct RpcU128<T: Display + FromStr>(#[serde(with = "self::serde_num_str")] T);
+
+impl<T: Display + FromStr> From<T> for RpcU128<T> {
+    fn from(value: T) -> Self {
+        RpcU128(value)
+    }
+}
+
+/// Number string serialization/deserialization
+pub mod serde_num_str {
+    use super::*;
+
+    /// A serializer that encodes the number as a string
+    pub fn serialize<S, T>(value: &T, serializer: S) -> StdResult<S::Ok, S::Error>
+        where
+            S: ser::Serializer,
+            T: Display,
+    {
+        serializer.serialize_str(&value.to_string())
+    }
+
+    /// A deserializer that decodes a string to the number.
+    pub fn deserialize<'de, D, T>(deserializer: D) -> StdResult<T, D::Error>
+        where
+            D: de::Deserializer<'de>,
+            T: FromStr,
+    {
+        let data = String::deserialize(deserializer)?;
+        data.parse::<T>()
+            .map_err(|_| de::Error::custom("Parse from string failed"))
+    }
+}
+
 #[rpc]
-pub trait ZenlinkDexApi<BlockHash, AccountId, AssetId> {
-    #[rpc(name = "zenlinkDex_exchanges")]
-    fn exchanges(&self, at: Option<BlockHash>) -> Result<Vec<Exchange<AccountId, AssetId>>>;
+pub trait ZenlinkDexApi<
+    BlockHash,
+    AccountId,
+    AssetId,
+    TokenBalance,
+    Balance,
+    ExchangeId
+> where
+    Balance: Display + FromStr
+{
+    #[rpc(name = "zenlinkDex_getTokenInfo")]
+    fn get_token_info(
+        &self,
+        at: Option<BlockHash>,
+        token_id: AssetId,
+    ) -> Result<Option<TokenInfo<
+        TokenBalance
+    >>>;
+
+    #[rpc(name = "zenlinkDex_getTokenBalance")]
+    fn get_token_balance(
+        &self,
+        at: Option<BlockHash>,
+        token_id: AssetId,
+        owner: AccountId,
+    ) -> Result<TokenBalance>;
+
+    #[rpc(name = "zenlinkDex_getTokenAllowance")]
+    fn get_token_allowance(
+        &self,
+        at: Option<BlockHash>,
+        token_id: AssetId,
+        owner: AccountId,
+        spender: AccountId,
+    ) -> Result<TokenBalance>;
+
+    #[rpc(name = "zenlinkDex_getExchangeByTokenId")]
+    fn get_exchange_by_token_id(
+        &self,
+        at: Option<BlockHash>,
+        token_id: AssetId,
+    ) -> Result<Option<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>>;
+
+    #[rpc(name = "zenlinkDex_getExchangeById")]
+    fn get_exchange_by_id(
+        &self,
+        at: Option<BlockHash>,
+        id: ExchangeId,
+    ) -> Result<Option<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>>;
+
+    // TODO：Pagination
+    #[rpc(name = "zenlinkDex_getExchanges")]
+    fn get_exchanges(
+        &self,
+        at: Option<BlockHash>,
+    ) -> Result<Vec<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>>;
 }
 
 const RUNTIME_ERROR: i64 = 1;
@@ -35,21 +151,167 @@ impl<C, M> ZenlinkDex<C, M> {
     }
 }
 
-impl<C, Block, AccountId, AssetId> ZenlinkDexApi<<Block as BlockT>::Hash, AccountId, AssetId> for ZenlinkDex<C, Block>
+impl<C, Block, AccountId, AssetId, TokenBalance, Balance, ExchangeId>
+ZenlinkDexApi<<Block as BlockT>::Hash, AccountId, AssetId, TokenBalance, Balance, ExchangeId>
+for ZenlinkDex<C, Block>
     where
         Block: BlockT,
         AccountId: Codec,
         AssetId: Codec,
+        TokenBalance: Codec,
+        Balance: Codec + Display + FromStr,
+        ExchangeId: Codec,
         C: Send + Sync + 'static,
         C: ProvideRuntimeApi<Block>,
         C: HeaderBackend<Block>,
-        C::Api: ZenlinkDexRuntimeApi<Block, AccountId, AssetId>,
+        C::Api: ZenlinkDexRuntimeApi<Block, AccountId, AssetId, TokenBalance, Balance, ExchangeId>,
 {
-    fn exchanges(&self, at: Option<<Block as BlockT>::Hash>) -> Result<Vec<Exchange<AccountId, AssetId>>> {
+    fn get_token_info(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+        token_id: AssetId,
+    ) -> Result<Option<TokenInfo<
+        TokenBalance
+    >>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(
+            || self.client.info().best_hash
+        ));
+
+        Ok(api.get_token_info(&at, token_id)
+            .map_err(runtime_error_into_rpc_err)?)
+    }
+
+    fn get_token_balance(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+        token_id: AssetId,
+        owner: AccountId,
+    ) -> Result<TokenBalance> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(
+            || self.client.info().best_hash
+        ));
+
+        Ok(api.get_token_balance(&at, token_id, owner)
+            .map_err(runtime_error_into_rpc_err)?)
+    }
+
+    fn get_token_allowance(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+        token_id: AssetId,
+        owner: AccountId,
+        spender: AccountId,
+    ) -> Result<TokenBalance> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(
+            || self.client.info().best_hash)
+        );
+
+        Ok(api.get_token_allowance(&at, token_id, owner, spender)
+            .map_err(runtime_error_into_rpc_err)?)
+    }
+
+    fn get_exchange_by_token_id(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+        token_id: AssetId,
+    ) -> Result<Option<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(
+            || self.client.info().best_hash)
+        );
+
+        Ok(api.get_exchange_by_token_id(&at, token_id)
+            .map(|option| {
+                option
+                    .map(|exchange_info| {
+                        ExchangeInfo {
+                            exchange: Exchange {
+                                token_id: exchange_info.exchange.token_id,
+                                liquidity_id: exchange_info.exchange.liquidity_id,
+                                account: exchange_info.exchange.account,
+                            },
+                            token_reserve: exchange_info.token_reserve,
+                            currency_reserve: exchange_info.currency_reserve.into(),
+                            exchange_id: exchange_info.exchange_id,
+                        }
+                    })
+            }).map_err(runtime_error_into_rpc_err)?)
+    }
+
+    fn get_exchange_by_id(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+        id: ExchangeId,
+    ) -> Result<Option<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(
+            || self.client.info().best_hash)
+        );
+
+        Ok(api.get_exchange_by_id(&at, id)
+            .map(|option| {
+                option
+                    .map(|exchange_info| {
+                        ExchangeInfo {
+                            exchange: Exchange {
+                                token_id: exchange_info.exchange.token_id,
+                                liquidity_id: exchange_info.exchange.liquidity_id,
+                                account: exchange_info.exchange.account,
+                            },
+                            token_reserve: exchange_info.token_reserve,
+                            currency_reserve: exchange_info.currency_reserve.into(),
+                            exchange_id: exchange_info.exchange_id,
+                        }
+                    })
+            }).map_err(runtime_error_into_rpc_err)?)
+    }
+
+    // TODO：Pagination
+    fn get_exchanges(
+        &self,
+        at: Option<<Block as BlockT>::Hash>,
+    ) -> Result<Vec<ExchangeInfo<
+        AccountId,
+        AssetId,
+        TokenBalance,
+        RpcU128<Balance>,
+        ExchangeId
+    >>> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(|| self.client.info().best_hash));
 
-        Ok(api.exchanges(&at).map_err(|e| runtime_error_into_rpc_err(e))?)
+        Ok(api.get_exchanges(&at)
+            .map(|exchanges| {
+                exchanges
+                    .into_iter()
+                    .map(|exchange_info| ExchangeInfo {
+                        exchange: Exchange {
+                            token_id: exchange_info.exchange.token_id,
+                            liquidity_id: exchange_info.exchange.liquidity_id,
+                            account: exchange_info.exchange.account,
+                        },
+                        token_reserve: exchange_info.token_reserve,
+                        currency_reserve: exchange_info.currency_reserve.into(),
+                        exchange_id: exchange_info.exchange_id,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .map_err(runtime_error_into_rpc_err)?)
     }
 }
 

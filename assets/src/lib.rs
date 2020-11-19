@@ -4,10 +4,13 @@
 use codec::{Decode, Encode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, ensure, Parameter};
 use frame_system::ensure_signed;
-use sp_runtime::traits::{
-    AtLeast32Bit, AtLeast32BitUnsigned, CheckedSub, Member, One, Saturating, StaticLookup, Zero,
-};
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
 use sp_runtime::{DispatchResult, RuntimeDebug};
+use sp_runtime::traits::{
+    AtLeast32Bit, AtLeast32BitUnsigned, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, StaticLookup,
+    Zero,
+};
 
 #[cfg(test)]
 mod mock;
@@ -20,6 +23,8 @@ type Symbol = [u8; 8];
 type Name = [u8; 16];
 
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct AssetInfo {
     pub name: Name,
     pub symbol: Symbol,
@@ -32,10 +37,10 @@ pub trait Trait: frame_system::Trait {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 
     /// The units in which we record balances.
-    type TokenBalance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
+    type TokenBalance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy + MaybeSerializeDeserialize;
 
     /// The arithmetic type of asset identifier.
-    type AssetId: Parameter + AtLeast32Bit + Default + Copy;
+    type AssetId: Parameter + AtLeast32Bit + Default + Copy + MaybeSerializeDeserialize;
 }
 
 // TODO: weight
