@@ -1,12 +1,40 @@
 #![allow(clippy::type_complexity)]
 
+#[cfg(feature = "std")]
+use std::result::Result as StdResult;
+
 use codec::{Decode, Encode};
 #[cfg(feature = "std")]
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, ser, Serialize};
 use sp_std::convert::TryInto;
 use sp_std::vec::Vec;
 
 use super::*;
+
+/// Text serialization/deserialization
+#[cfg(feature = "std")]
+pub mod serde_text {
+    use super::*;
+
+    /// A serializer that encodes the bytes as a string
+    pub fn serialize<T, S>(value: &T, serializer: S) -> StdResult<S::Ok, S::Error>
+        where
+            S: ser::Serializer,
+            T: AsRef<[u8]>,
+    {
+        let output = String::from_utf8_lossy(value.as_ref());
+        serializer.serialize_str(&output)
+    }
+
+    /// A deserializer that decodes the string to the bytes (Vec<u8>)
+    pub fn deserialize<'de, D>(deserializer: D) -> StdResult<Vec<u8>, D::Error>
+        where
+            D: de::Deserializer<'de>,
+    {
+        let data = String::deserialize(deserializer)?;
+        Ok(data.into_bytes())
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Default, Encode, Decode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -24,8 +52,11 @@ pub struct ExchangeInfo<AccountId, AssetId, TokenBalance, Balance, ExchangeId> {
 #[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct TokenInfo<TokenBalance> {
     pub current_supply: TokenBalance,
-    #[cfg_attr(feature = "std", serde(flatten))]
-    pub asset_info: AssetInfo,
+    #[cfg_attr(feature = "std", serde(with = "self::serde_text"))]
+    pub name: Vec<u8>,
+    #[cfg_attr(feature = "std", serde(with = "self::serde_text"))]
+    pub symbol: Vec<u8>,
+    pub decimals: u8,
 }
 
 impl<T: Trait> Module<T> {
@@ -34,7 +65,17 @@ impl<T: Trait> Module<T> {
             .map(|asset_info| {
                 let current_supply = <zenlink_assets::Module<T>>::total_supply(&token_id);
                 TokenInfo {
-                    asset_info,
+                    name: asset_info.name
+                        .to_vec()
+                        .into_iter()
+                        .take_while(|c| *c != 0u8)
+                        .collect::<Vec<_>>(),
+                    symbol: asset_info.symbol
+                        .to_vec()
+                        .into_iter()
+                        .take_while(|c| *c != 0u8)
+                        .collect::<Vec<_>>(),
+                    decimals: asset_info.decimals,
                     current_supply,
                 }
             })

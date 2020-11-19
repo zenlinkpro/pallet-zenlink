@@ -66,7 +66,8 @@ pub trait ZenlinkDexApi<
     Balance,
     ExchangeId
 > where
-    Balance: Display + FromStr
+    Balance: Display + FromStr,
+    TokenBalance: Display + FromStr,
 {
     #[rpc(name = "zenlinkDex_getTokenInfo")]
     fn get_token_info(
@@ -74,7 +75,7 @@ pub trait ZenlinkDexApi<
         at: Option<BlockHash>,
         token_id: AssetId,
     ) -> Result<Option<TokenInfo<
-        TokenBalance
+        RpcU128<TokenBalance>
     >>>;
 
     #[rpc(name = "zenlinkDex_getTokenBalance")]
@@ -83,7 +84,7 @@ pub trait ZenlinkDexApi<
         at: Option<BlockHash>,
         token_id: AssetId,
         owner: AccountId,
-    ) -> Result<TokenBalance>;
+    ) -> Result<RpcU128<TokenBalance>>;
 
     #[rpc(name = "zenlinkDex_getTokenAllowance")]
     fn get_token_allowance(
@@ -92,7 +93,7 @@ pub trait ZenlinkDexApi<
         token_id: AssetId,
         owner: AccountId,
         spender: AccountId,
-    ) -> Result<TokenBalance>;
+    ) -> Result<RpcU128<TokenBalance>>;
 
     #[rpc(name = "zenlinkDex_getExchangeByTokenId")]
     fn get_exchange_by_token_id(
@@ -102,7 +103,7 @@ pub trait ZenlinkDexApi<
     ) -> Result<Option<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>>;
@@ -115,7 +116,7 @@ pub trait ZenlinkDexApi<
     ) -> Result<Option<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>>;
@@ -128,7 +129,7 @@ pub trait ZenlinkDexApi<
     ) -> Result<Vec<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>>;
@@ -158,7 +159,7 @@ for ZenlinkDex<C, Block>
         Block: BlockT,
         AccountId: Codec,
         AssetId: Codec,
-        TokenBalance: Codec,
+        TokenBalance: Codec + Display + FromStr,
         Balance: Codec + Display + FromStr,
         ExchangeId: Codec,
         C: Send + Sync + 'static,
@@ -171,7 +172,7 @@ for ZenlinkDex<C, Block>
         at: Option<<Block as BlockT>::Hash>,
         token_id: AssetId,
     ) -> Result<Option<TokenInfo<
-        TokenBalance
+        RpcU128<TokenBalance>
     >>> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(
@@ -179,6 +180,17 @@ for ZenlinkDex<C, Block>
         ));
 
         Ok(api.get_token_info(&at, token_id)
+            .map(|option| {
+                option
+                    .map(|token_info| {
+                        TokenInfo {
+                            current_supply: token_info.current_supply.into(),
+                            name: token_info.name,
+                            symbol: token_info.symbol,
+                            decimals: token_info.decimals,
+                        }
+                    })
+            })
             .map_err(runtime_error_into_rpc_err)?)
     }
 
@@ -187,13 +199,14 @@ for ZenlinkDex<C, Block>
         at: Option<<Block as BlockT>::Hash>,
         token_id: AssetId,
         owner: AccountId,
-    ) -> Result<TokenBalance> {
+    ) -> Result<RpcU128<TokenBalance>> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(
             || self.client.info().best_hash
         ));
 
         Ok(api.get_token_balance(&at, token_id, owner)
+            .map(|token_balance| token_balance.into())
             .map_err(runtime_error_into_rpc_err)?)
     }
 
@@ -203,13 +216,14 @@ for ZenlinkDex<C, Block>
         token_id: AssetId,
         owner: AccountId,
         spender: AccountId,
-    ) -> Result<TokenBalance> {
+    ) -> Result<RpcU128<TokenBalance>> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(
             || self.client.info().best_hash)
         );
 
         Ok(api.get_token_allowance(&at, token_id, owner, spender)
+            .map(|token_balance| token_balance.into())
             .map_err(runtime_error_into_rpc_err)?)
     }
 
@@ -220,7 +234,7 @@ for ZenlinkDex<C, Block>
     ) -> Result<Option<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>> {
@@ -239,7 +253,7 @@ for ZenlinkDex<C, Block>
                                 liquidity_id: exchange_info.exchange.liquidity_id,
                                 account: exchange_info.exchange.account,
                             },
-                            token_reserve: exchange_info.token_reserve,
+                            token_reserve: exchange_info.token_reserve.into(),
                             currency_reserve: exchange_info.currency_reserve.into(),
                             exchange_id: exchange_info.exchange_id,
                         }
@@ -254,7 +268,7 @@ for ZenlinkDex<C, Block>
     ) -> Result<Option<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>> {
@@ -273,7 +287,7 @@ for ZenlinkDex<C, Block>
                                 liquidity_id: exchange_info.exchange.liquidity_id,
                                 account: exchange_info.exchange.account,
                             },
-                            token_reserve: exchange_info.token_reserve,
+                            token_reserve: exchange_info.token_reserve.into(),
                             currency_reserve: exchange_info.currency_reserve.into(),
                             exchange_id: exchange_info.exchange_id,
                         }
@@ -288,7 +302,7 @@ for ZenlinkDex<C, Block>
     ) -> Result<Vec<ExchangeInfo<
         AccountId,
         AssetId,
-        TokenBalance,
+        RpcU128<TokenBalance>,
         RpcU128<Balance>,
         ExchangeId
     >>> {
@@ -305,7 +319,7 @@ for ZenlinkDex<C, Block>
                             liquidity_id: exchange_info.exchange.liquidity_id,
                             account: exchange_info.exchange.account,
                         },
-                        token_reserve: exchange_info.token_reserve,
+                        token_reserve: exchange_info.token_reserve.into(),
                         currency_reserve: exchange_info.currency_reserve.into(),
                         exchange_id: exchange_info.exchange_id,
                     })

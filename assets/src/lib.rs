@@ -4,8 +4,6 @@
 use codec::{Decode, Encode};
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, ensure, Parameter};
 use frame_system::ensure_signed;
-#[cfg(feature = "std")]
-use serde::{Deserialize, Serialize};
 use sp_runtime::{DispatchResult, RuntimeDebug};
 use sp_runtime::traits::{
     AtLeast32Bit, AtLeast32BitUnsigned, CheckedSub, MaybeSerializeDeserialize, Member, One, Saturating, StaticLookup,
@@ -23,8 +21,6 @@ type Symbol = [u8; 8];
 type Name = [u8; 16];
 
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "std", serde(rename_all = "camelCase"))]
 pub struct AssetInfo {
     pub name: Name,
     pub symbol: Symbol,

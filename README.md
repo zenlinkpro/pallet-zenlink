@@ -13,9 +13,10 @@ the [Zenlink Protocol](https://zenlink.pro/) which is `A cross-chain DEX network
 - add some liquidity to the exchange by `zenlink-dex` module.
 - swap in the `currency-token`,`token-currency` and `token-token` exchanges by `zenlink-dex` module.
 
-## tests
+## build and tests
 
 ```bash
+cargo +nightly-2020-10-05 build
 cargo test
 ```
 
